@@ -1,0 +1,93 @@
+package model.rules;
+
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
+
+import model.IPiece;
+import model.IPosition;
+import model.State;
+
+/**
+ * The Rules class implements the game-independent portion of the algorithm for calculating the set
+ * of potential new states of the game given the current state. 
+ * @author zpconn
+ *
+ */
+public class Rules {
+	/**
+	 * A reference to the Board visitor for calculating the new states.
+	 */
+	private Board boardVisitor;
+	
+	/**
+	 * Initializes this game-independent Rules object with a game-specific Board.
+	 * @param visitor The game-specific board.
+	 */
+	public Rules(Board visitor) {
+		boardVisitor = visitor;
+	}
+	
+	public boolean checkWinningCondition(State s) {
+		return boardVisitor.checkWinningCondition(s);
+	}
+	
+	/**
+	 * Gets the initial state of the game.
+	 * @return The initial state of the game.
+	 */
+	public State getBaseState() {
+		return boardVisitor.constructInitialState();
+	}
+	
+	/**
+	 * Given the current state of the game, this computes all possible states which can be achieved
+	 * in the course of one move by any moveable pieces. The algorithm works as follows. We look at all
+	 * moveable pieces on the board. For each such piece we enumerate all possible moves using the visitor.
+	 * For each such move we produce a new state and place this state into a hashmap. The hashmap allows
+	 * us to efficiently prevent returning duplicate states.
+	 * 
+	 * When this process is completed, we return the keys in the hashmap as the set of next valid states.
+	 * @param s The current state of the game.
+	 * @return A collection of new valid states which can be achieved via the moving of one piece.
+	 */
+	public Collection<State> getNextValidStates(State s) {
+		HashMap<State, Boolean> nextStates = new HashMap<State, Boolean>();
+		
+		Map<IPosition, IPiece> pieces = s.getPieceLocations();
+		
+		for (IPosition pos : pieces.keySet()) {
+			IPiece piece = pieces.get(pos);
+			
+			// We execute our visitor on this piece to get the set of next possible states.
+			// The input parameter to the visitor is the location of the piece.
+			
+			Collection<State> nextStatesForPiece = boardVisitor.getAvailableMoves(piece, pos, s);
+			
+			// Now we merge these states into the hash map, which lets us efficiently avoid adding 
+			// duplicate states (as distinct moves may lead to equivalent states of the board).
+			
+			for (State state : nextStatesForPiece) {
+				if (!nextStates.containsKey(state)) {
+					nextStates.put(state, true);
+				}
+			}
+		}
+		
+		// Now we do the same for the pieces in the useable pool.
+		
+		for (IPiece useablePiece : s.getUseablePieces()) {
+			Collection<State> nextStatesForPiece = boardVisitor.getAvailableMoves(useablePiece, 
+				                  								                  boardVisitor.getUseablePoolPosition(), s);
+			
+			for (State state : nextStatesForPiece) {
+				if (!nextStates.containsKey(state)) {
+					nextStates.put(state, true);
+				}
+			}
+		}
+		
+		// Now we just return the key set of the hash map, which has automatically filtered out duplicates.
+		return nextStates.keySet();
+	}
+}
